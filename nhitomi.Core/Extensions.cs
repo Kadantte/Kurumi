@@ -177,38 +177,40 @@ namespace nhitomi.Core
             }
         }
 
-        public static IAsyncEnumerable<T> Interleave<T>(IEnumerable<IAsyncEnumerable<T>> source) =>
-            AsyncEnumerable.CreateEnumerable(() =>
+        public static async IAsyncEnumerable<T> Interleave<T>(
+            IEnumerable<IAsyncEnumerable<T>> source,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var enumerators = source.Select(s => s.GetAsyncEnumerator(cancellationToken)).ToList();
+            var current = -1;
+
+            try
             {
-                var enumerators = source.Select(s => s.GetEnumerator()).ToList();
-                var current     = -1;
+                while (enumerators.Count > 0)
+                {
+                    // Next enumerator
+                    if (++current >= enumerators.Count)
+                        current = 0;
 
-                return AsyncEnumerable.CreateEnumerator(
-                    async token =>
+                    if (await enumerators[current].MoveNextAsync())
                     {
-                        while (enumerators.Count > 0)
-                        {
-                            // Next enumerator
-                            if (++current >= enumerators.Count)
-                                current = 0;
-
-                            if (await enumerators[current].MoveNext(token))
-                                return true;
-
-                            // Remove failing enumerators
-                            enumerators.RemoveAt(current);
-                        }
-
-                        return false;
-                    },
-                    () => enumerators[current].Current,
-                    () =>
-                    {
-                        foreach (var enumerator in enumerators)
-                            enumerator.Dispose();
+                        yield return enumerators[current].Current;
                     }
-                );
-            });
+                    else
+                    {
+                        // Remove exhausted enumerators
+                        await enumerators[current].DisposeAsync();
+                        enumerators.RemoveAt(current);
+                        current--;
+                    }
+                }
+            }
+            finally
+            {
+                foreach (var enumerator in enumerators)
+                    await enumerator.DisposeAsync();
+            }
+        }
 
         public static Task<T> AsCompletedTask<T>(this T obj) => Task.FromResult(obj);
 

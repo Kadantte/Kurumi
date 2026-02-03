@@ -1,47 +1,97 @@
+using System.ComponentModel.DataAnnotations;
+using Discord;
 using Discord.WebSocket;
 
-namespace nhitomi
+namespace nhitomi;
+
+public sealed class AppSettings : IValidatableObject
 {
-    public sealed class AppSettings
+    public DiscordSettings Discord { get; set; } = new();
+    public HttpSettings Http { get; set; } = new();
+    public FeedSettings Feed { get; set; } = new();
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        public DiscordSettings Discord { get; set; } = new DiscordSettings();
+        if (string.IsNullOrWhiteSpace(Discord.Token))
+            yield return new ValidationResult("Discord:Token is required", new[] { nameof(Discord) });
 
-        public sealed class DiscordSettings : DiscordSocketConfig
+        if (Http.TimeoutSeconds <= 0)
+            yield return new ValidationResult("Http:TimeoutSeconds must be positive", new[] { nameof(Http) });
+
+        if (Http.RetryCount < 0)
+            yield return new ValidationResult("Http:RetryCount cannot be negative", new[] { nameof(Http) });
+
+        if (Http.RetryDelayMilliseconds < 0)
+            yield return new ValidationResult("Http:RetryDelayMilliseconds cannot be negative", new[] { nameof(Http) });
+    }
+
+    /// <summary>
+    /// Validates the settings and throws if invalid.
+    /// </summary>
+    public void ValidateAndThrow()
+    {
+        var results = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(this, new ValidationContext(this), results, true))
         {
-            public string Prefix { get; set; }
-            public string Token { get; set; }
-            public string BotInvite { get; set; }
-
-            public StatusSettings Status { get; set; } = new StatusSettings();
-
-            public sealed class StatusSettings
-            {
-                public double UpdateInterval { get; set; }
-                public string[] Games { get; set; }
-            }
-
-            public GuildSettings Guild { get; set; } = new GuildSettings();
-
-            public sealed class GuildSettings
-            {
-                public ulong GuildId { get; set; }
-                public string GuildInvite { get; set; }
-                public ulong ErrorChannelId { get; set; }
-            }
+            var errors = string.Join(Environment.NewLine, results.Select(r => r.ErrorMessage));
+            throw new InvalidOperationException($"Configuration validation failed:{Environment.NewLine}{errors}");
         }
 
-        public HttpSettings Http { get; set; } = new HttpSettings();
-
-        public sealed class HttpSettings
+        // Run IValidatableObject validation
+        var customResults = Validate(new ValidationContext(this)).ToList();
+        if (customResults.Count > 0)
         {
-            public bool EnableProxy { get; set; }
+            var errors = string.Join(Environment.NewLine, customResults.Select(r => r.ErrorMessage));
+            throw new InvalidOperationException($"Configuration validation failed:{Environment.NewLine}{errors}");
+        }
+    }
+
+    public sealed class DiscordSettings
+    {
+        public string? Token { get; set; }
+        public string? BotInvite { get; set; }
+        public ulong? TestGuildId { get; set; }
+
+        public StatusSettings Status { get; set; } = new();
+        public GuildSettings Guild { get; set; } = new();
+
+        public DiscordSocketConfig GetSocketConfig() => new()
+        {
+            GatewayIntents = GatewayIntents.Guilds |
+                             GatewayIntents.GuildMessages |
+                             GatewayIntents.GuildMessageReactions |
+                             GatewayIntents.DirectMessages |
+                             GatewayIntents.DirectMessageReactions |
+                             GatewayIntents.MessageContent,
+            AlwaysDownloadUsers = false,
+            MessageCacheSize = 100,
+            LogLevel = LogSeverity.Info
+        };
+
+        public sealed class StatusSettings
+        {
+            public double UpdateInterval { get; set; } = 60;
+            public string[] Games { get; set; } = [];
         }
 
-        public FeedSettings Feed { get; set; } = new FeedSettings();
-
-        public sealed class FeedSettings
+        public sealed class GuildSettings
         {
-            public bool Enabled { get; set; }
+            public ulong GuildId { get; set; }
+            public string? GuildInvite { get; set; }
+            public ulong ErrorChannelId { get; set; }
         }
+    }
+
+    public sealed class HttpSettings
+    {
+        public bool EnableProxy { get; set; }
+        public int TimeoutSeconds { get; set; } = 30;
+        public int RetryCount { get; set; } = 3;
+        public int RetryDelayMilliseconds { get; set; } = 500;
+    }
+
+    public sealed class FeedSettings
+    {
+        public bool Enabled { get; set; }
     }
 }

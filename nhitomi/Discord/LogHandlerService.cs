@@ -21,14 +21,14 @@ namespace nhitomi.Discord
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _discord.Log += HandleLogAsync;
+            _discord.Client.Log += HandleLogAsync;
 
             return Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            _discord.Log -= HandleLogAsync;
+            _discord.Client.Log -= HandleLogAsync;
 
             return Task.CompletedTask;
         }

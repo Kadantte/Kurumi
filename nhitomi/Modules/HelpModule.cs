@@ -1,118 +1,122 @@
-using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Discord;
+using Discord.Interactions;
+using Discord.WebSocket;
 using nhitomi.Discord;
-using nhitomi.Discord.Parsing;
 using nhitomi.Interactivity;
 
-namespace nhitomi.Modules
+namespace nhitomi.Modules;
+
+[RateLimit]
+public class HelpModule : InteractionModuleBase<SocketInteractionContext>
 {
-    [Module("help", IsPrefixed = false)]
-    public class HelpModule
+    private readonly InteractiveManager _interactive;
+    private readonly GuildSettingsCache _guildSettings;
+
+    public HelpModule(
+        InteractiveManager interactive,
+        GuildSettingsCache guildSettings)
     {
-        readonly IMessageContext _context;
-        readonly InteractiveManager _interactive;
+        _interactive = interactive;
+        _guildSettings = guildSettings;
+    }
 
-        public HelpModule(IMessageContext context,
-                          InteractiveManager interactive)
+    private IDiscordContext CreateContext() => new SlashCommandContextAdapter(Context, _guildSettings);
+
+    [SlashCommand("help", "Show help information about the bot")]
+    public async Task HelpAsync()
+    {
+        await DeferAsync();
+        await _interactive.SendInteractiveAsync(new HelpMessage(), CreateContext());
+    }
+
+    [SlashCommand("debug", "Show debug and diagnostic information")]
+    public async Task DebugAsync()
+    {
+        await DeferAsync();
+        await _interactive.SendInteractiveAsync(new DebugMessage(), CreateContext());
+    }
+
+    internal sealed class DebugMessage : EmbedMessage<DebugMessage.View>
+    {
+        public class View : ViewBase
         {
-            _context     = context;
-            _interactive = interactive;
-        }
+            private readonly DiscordService _discord;
+            private readonly MessageHandlerService _messageHandler;
+            private readonly ReactionHandlerService _reactionHandler;
+            private readonly InteractiveManager _interactive;
+            private readonly FeedChannelUpdateService _feedChannelUpdater;
 
-        [Command("help", Alias = "h")]
-        public Task HelpAsync(CancellationToken cancellationToken = default) =>
-            _interactive.SendInteractiveAsync(new HelpMessage(), _context, cancellationToken);
-
-        [Command("debug")]
-        public Task DebugAsync(CancellationToken cancellationToken = default) =>
-            _interactive.SendInteractiveAsync(new DebugMessage(), _context, cancellationToken);
-
-        sealed class DebugMessage : EmbedMessage<DebugMessage.View>
-        {
-            public class View : ViewBase
+            public View(
+                DiscordService discord,
+                MessageHandlerService messageHandler,
+                ReactionHandlerService reactionHandler,
+                InteractiveManager interactive,
+                FeedChannelUpdateService feedChannelUpdater)
             {
-                readonly DiscordService _discord;
-                readonly MessageHandlerService _messageHandler;
-                readonly ReactionHandlerService _reactionHandler;
-                readonly InteractiveManager _interactive;
-                readonly FeedChannelUpdateService _feedChannelUpdater;
+                _discord = discord;
+                _messageHandler = messageHandler;
+                _reactionHandler = reactionHandler;
+                _interactive = interactive;
+                _feedChannelUpdater = feedChannelUpdater;
+            }
 
-                public View(DiscordService discord,
-                            MessageHandlerService messageHandler,
-                            ReactionHandlerService reactionHandler,
-                            InteractiveManager interactive,
-                            FeedChannelUpdateService feedChannelUpdater)
+            private sealed class ProcessMemory
+            {
+                public readonly long Virtual;
+                public readonly long WorkingSet;
+                public readonly long Managed;
+
+                private const long Mebibytes = 1024 * 1024;
+
+                public ProcessMemory()
                 {
-                    _discord            = discord;
-                    _messageHandler     = messageHandler;
-                    _reactionHandler    = reactionHandler;
-                    _interactive        = interactive;
-                    _feedChannelUpdater = feedChannelUpdater;
+                    using var process = Process.GetCurrentProcess();
+                    Virtual = process.VirtualMemorySize64 / Mebibytes;
+                    WorkingSet = process.WorkingSet64 / Mebibytes;
+                    Managed = GC.GetTotalMemory(false) / Mebibytes;
                 }
+            }
 
-                sealed class ProcessMemory
-                {
-                    public readonly long Virtual;
-                    public readonly long WorkingSet;
-                    public readonly long Managed;
+            public override async Task<bool> UpdateAsync(CancellationToken cancellationToken = default)
+            {
+                var memory = new ProcessMemory();
+                var client = _discord.Client;
 
-                    const long _mebibytes = 1024 * 1024;
-
-                    public ProcessMemory()
-                    {
-                        using (var process = Process.GetCurrentProcess())
-                        {
-                            Virtual    = process.VirtualMemorySize64 / _mebibytes;
-                            WorkingSet = process.WorkingSet64 / _mebibytes;
-                        }
-
-                        Managed = GC.GetTotalMemory(false) / _mebibytes;
-                    }
-                }
-
-                public override async Task<bool> UpdateAsync(CancellationToken cancellationToken = default)
-                {
-                    var memory = new ProcessMemory();
-
-                    var embed = new EmbedBuilder()
-                               .WithTitle("**nhitomi**: Debug information")
-                               .WithFields(
-                                    new EmbedFieldBuilder()
-                                       .WithName("Discord")
-                                       .WithValue($@"
-Guilds: {_discord.Guilds.Count} guilds
-Channels: {_discord.Guilds.Sum(g => g.TextChannels.Count) + _discord.PrivateChannels.Count} channels
-Users: {_discord.Guilds.Sum(g => g.MemberCount)} users
+                var embed = new EmbedBuilder()
+                    .WithTitle("**nhitomi**: Debug information")
+                    .WithFields(
+                        new EmbedFieldBuilder()
+                            .WithName("Discord")
+                            .WithValue($@"
+Guilds: {client.Guilds.Count} guilds
+Channels: {client.Guilds.Sum(g => g.TextChannels.Count) + client.PrivateChannels.Count} channels
+Users: {client.Guilds.Sum(g => g.MemberCount)} users
 Feed channels: {_feedChannelUpdater.UpdaterTasks.Count} updater tasks
-Latency: {_discord.Latency}ms
+Latency: {client.Latency}ms
 Handled messages: {_messageHandler.HandledMessages} messages ({_messageHandler.ReceivedMessages} received)
 Handled reactions: {_reactionHandler.HandledReactions} reactions ({_reactionHandler.ReceivedReactions} received)
 Interactive messages: {_interactive.InteractiveMessages.Count} messages
 Interactive triggers: {_interactive.InteractiveMessages.Sum(m => m.Value.Triggers.Count)} triggers
 ".Trim()),
-                                    new EmbedFieldBuilder()
-                                       .WithName("Process")
-                                       .WithValue($@"
+                        new EmbedFieldBuilder()
+                            .WithName("Process")
+                            .WithValue($@"
 Virtual memory: {memory.Virtual}MiB
 Working set memory: {memory.WorkingSet}MiB
 Managed memory: {memory.Managed}MiB
 ".Trim()),
-                                    new EmbedFieldBuilder()
-                                       .WithName("Runtime")
-                                       .WithValue($@"
+                        new EmbedFieldBuilder()
+                            .WithName("Runtime")
+                            .WithValue($@"
 {RuntimeInformation.OSDescription} {RuntimeInformation.OSArchitecture}
 {RuntimeInformation.FrameworkDescription}
 ".Trim()))
-                               .Build();
+                    .Build();
 
-                    await SetEmbedAsync(embed, cancellationToken);
-                    return true;
-                }
+                await SetEmbedAsync(embed, cancellationToken);
+                return true;
             }
         }
     }

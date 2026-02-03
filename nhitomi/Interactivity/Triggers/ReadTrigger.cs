@@ -40,7 +40,7 @@ namespace nhitomi.Interactivity.Triggers
                 if (isFeed || Interactive?.Source?.Id != Context.User.Id)
                     context = new DiscordContextWrapper(context)
                     {
-                        Channel = await Context.User.GetOrCreateDMChannelAsync()
+                        Channel = await Context.User.CreateDMChannelAsync()
                     };
 
                 // send read interactive

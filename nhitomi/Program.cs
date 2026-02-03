@@ -1,60 +1,71 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using nhitomi.Core;
 using nhitomi.Discord;
 
-namespace nhitomi
-{
-    public static class Program
-    {
-        static async Task Main()
-        {
-            // build host
-            using (var host = new HostBuilder()
-                             .UseContentRoot(Environment.CurrentDirectory)
-                             .UseEnvironment(Environment.GetEnvironmentVariable("ENVIRONMENT") ??
-                                             EnvironmentName.Development)
-                             .ConfigureAppConfiguration(Startup.Configure)
-                             .ConfigureServices(Startup.ConfigureServices)
-                             .Build())
-            {
-                // initialization
-                using (var scope = host.Services.CreateScope())
-                    await DependencyUtility<Initialization>.Factory(scope.ServiceProvider).RunAsync();
+namespace nhitomi;
 
-                // run host
-                await host.RunAsync();
-            }
+public static class Program
+{
+    public static async Task Main(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        Startup.Configure(builder.Configuration, builder.Environment);
+
+        // Validate configuration before proceeding
+        var settings = builder.Configuration.Get<AppSettings>() ?? new AppSettings();
+        if (!builder.Environment.IsDevelopment())
+        {
+            settings.ValidateAndThrow();
         }
 
-        sealed class Initialization
+        Startup.ConfigureServices(builder.Services, builder.Configuration);
+
+        using var host = builder.Build();
+
+        // Initialization
+        using (var scope = host.Services.CreateScope())
         {
-            readonly IHostingEnvironment _environment;
-            readonly nhitomiDbContext _db;
-            readonly DiscordService _discord;
+            var initialization = new Initialization(
+                scope.ServiceProvider.GetRequiredService<IHostEnvironment>(),
+                scope.ServiceProvider.GetRequiredService<nhitomiDbContext>(),
+                scope.ServiceProvider.GetRequiredService<DiscordService>()
+            );
+            await initialization.RunAsync();
+        }
 
-            public Initialization(IHostingEnvironment environment,
-                                  nhitomiDbContext db,
-                                  DiscordService discord)
-            {
-                _environment = environment;
-                _db          = db;
-                _discord     = discord;
-            }
+        await host.RunAsync();
+    }
 
-            public async Task RunAsync(CancellationToken cancellationToken = default)
-            {
-                // migrate database for development
-                if (_environment.IsDevelopment())
-                    await _db.Database.MigrateAsync(cancellationToken);
+    private sealed class Initialization
+    {
+        private readonly IHostEnvironment _environment;
+        private readonly nhitomiDbContext _db;
+        private readonly DiscordService _discord;
 
-                // start discord
-                await _discord.ConnectAsync();
-            }
+        public Initialization(
+            IHostEnvironment environment,
+            nhitomiDbContext db,
+            DiscordService discord)
+        {
+            _environment = environment;
+            _db = db;
+            _discord = discord;
+        }
+
+        public async Task RunAsync(CancellationToken cancellationToken = default)
+        {
+            // Migrate database for development
+            if (_environment.IsDevelopment())
+                await _db.Database.MigrateAsync(cancellationToken);
+
+            // Start discord and register slash commands
+            await _discord.ConnectAsync();
+            await _discord.RegisterCommandsAsync();
         }
     }
 }

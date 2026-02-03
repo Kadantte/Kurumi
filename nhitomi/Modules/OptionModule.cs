@@ -1,102 +1,227 @@
-using System.Threading;
-using System.Threading.Tasks;
 using Discord;
+using Discord.Interactions;
+using Microsoft.Extensions.Options;
 using nhitomi.Core;
 using nhitomi.Discord;
-using nhitomi.Discord.Parsing;
 using nhitomi.Globalization;
-using nhitomi.Interactivity;
 
-namespace nhitomi.Modules
+namespace nhitomi.Modules;
+
+[Group("settings", "Configure bot settings for this server")]
+[RateLimit]
+[RequireGuildAdmin]
+public class OptionModule : InteractionModuleBase<SocketInteractionContext>
 {
-    [Module("option", Alias = "o")]
-    public partial class OptionModule
+    private readonly IDatabase _db;
+    private readonly GuildSettingsCache _settingsCache;
+
+    public OptionModule(
+        IDatabase db,
+        GuildSettingsCache settingsCache)
     {
-        readonly IDiscordContext _context;
-        readonly IDatabase _db;
-        readonly GuildSettingsCache _settingsCache;
-        readonly InteractiveManager _interactive;
+        _db = db;
+        _settingsCache = settingsCache;
+    }
 
-        public OptionModule(IDiscordContext context,
-                            IDatabase db,
-                            GuildSettingsCache settingsCache,
-                            InteractiveManager interactive)
+    [SlashCommand("language", "Set the bot language for this server")]
+    public async Task LanguageAsync(
+        [Summary("language", "Language code to set")]
+        [Choice("English", "en")]
+        [Choice("Indonesian", "id")]
+        [Choice("Korean", "ko")]
+        string language)
+    {
+        await DeferAsync();
+
+        if (!Localization.IsAvailable(language))
         {
-            _context       = context;
-            _db            = db;
-            _settingsCache = settingsCache;
-            _interactive   = interactive;
+            await FollowupAsync($"Language '{language}' is not available.", ephemeral: true);
+            return;
         }
 
-        public static async Task<bool> EnsureGuildAdminAsync(IDiscordContext context,
-                                                             CancellationToken cancellationToken = default)
+        if (Context.Guild == null)
         {
-            if (!(context.User is IGuildUser user))
-            {
-                await context.ReplyAsync("commandInvokeNotInGuild");
-                return false;
-            }
+            await FollowupAsync("This command can only be used in a server.", ephemeral: true);
+            return;
+        }
 
-            if (!user.GuildPermissions.ManageGuild)
-            {
-                await context.ReplyAsync("notGuildAdmin");
-                return false;
-            }
+        Guild? guild;
 
+        do
+        {
+            guild = await _db.GetGuildAsync(Context.Guild.Id);
+            guild.Language = language;
+        }
+        while (!await _db.SaveAsync());
+
+        _settingsCache[Context.Channel] = guild;
+
+        var localization = Localization.GetLocalization(language);
+        await FollowupAsync($"Language changed to {localization.Culture.EnglishName} ({language}).");
+    }
+}
+
+[Group("feed", "Configure feed channels for automatic doujin updates")]
+[RateLimit]
+[RequireGuildAdmin]
+public class FeedModule : InteractionModuleBase<SocketInteractionContext>
+{
+    private readonly AppSettings _settings;
+    private readonly IDatabase _db;
+    private readonly GuildSettingsCache _guildSettings;
+
+    public FeedModule(
+        IOptions<AppSettings> options,
+        IDatabase db,
+        GuildSettingsCache guildSettings)
+    {
+        _settings = options.Value;
+        _db = db;
+        _guildSettings = guildSettings;
+    }
+
+    private async Task<bool> EnsureFeedEnabled()
+    {
+        if (_settings.Feed.Enabled)
             return true;
-        }
 
-        [Command("language", Alias = "l")]
-        public async Task LanguageAsync(string language,
-                                        CancellationToken cancellationToken = default)
+        await RespondAsync("Feed channels are currently disabled.", ephemeral: true);
+        return false;
+    }
+
+    [SlashCommand("add-tag", "Add a tag to the feed channel whitelist")]
+    public async Task AddTagAsync(
+        [Summary("tag", "Tag to add to the whitelist")] string tag)
+    {
+        if (!await EnsureFeedEnabled())
+            return;
+
+        await DeferAsync();
+
+        var guildSettings = _guildSettings[Context.Channel];
+        if (guildSettings == null)
         {
-            if (!await EnsureGuildAdminAsync(_context, cancellationToken))
-                return;
-
-            // ensure language exists
-            if (Localization.IsAvailable(language))
-            {
-                Guild guild;
-
-                do
-                {
-                    guild = await _db.GetGuildAsync(_context.GuildSettings.Id, cancellationToken);
-
-                    guild.Language = language;
-                }
-                while (!await _db.SaveAsync(cancellationToken));
-
-                // update cache
-                _settingsCache[_context.Channel] = guild;
-
-                // respond in the new language
-                await new DiscordContextWrapper(_context) { GuildSettings = guild }
-                   .ReplyAsync("localizationChanged",
-                               new
-                               {
-                                   localization = Localization.GetLocalization(language)
-                               });
-            }
-            else
-            {
-                await _context.ReplyAsync("localizationNotFound", new { language });
-            }
+            await FollowupAsync("Could not retrieve guild settings.", ephemeral: true);
+            return;
         }
 
-        [Command("language")]
-        public Task LanguageAsync(CancellationToken cancellationToken = default) => _interactive.SendInteractiveAsync(
-            new CommandHelpMessage
+        var added = false;
+
+        do
+        {
+            var channel = await _db.GetFeedChannelAsync(
+                guildSettings.Id,
+                Context.Channel.Id);
+
+            var tags = await _db.GetTagsAsync(tag);
+
+            if (tags.Length == 0)
             {
-                Command        = "language",
-                Aliases        = new[] { "l" },
-                DescriptionKey = "options.language",
-                Examples = new[]
+                await FollowupAsync($"Tag '{tag}' not found.", ephemeral: true);
+                return;
+            }
+
+            foreach (var t in tags)
+            {
+                var tagRef = channel.Tags.FirstOrDefault(x => x.TagId == t.Id);
+
+                if (tagRef == null)
                 {
-                    "en",
-                    "english"
+                    channel.Tags.Add(new FeedChannelTag
+                    {
+                        Tag = t
+                    });
+
+                    added = true;
                 }
-            },
-            _context,
-            cancellationToken);
+            }
+        }
+        while (!await _db.SaveAsync());
+
+        if (added)
+            await FollowupAsync($"Added tag '{tag}' to feed channel.");
+        else
+            await FollowupAsync($"Tag '{tag}' is already in the feed channel whitelist.", ephemeral: true);
+    }
+
+    [SlashCommand("remove-tag", "Remove a tag from the feed channel whitelist")]
+    public async Task RemoveTagAsync(
+        [Summary("tag", "Tag to remove from the whitelist")] string tag)
+    {
+        if (!await EnsureFeedEnabled())
+            return;
+
+        await DeferAsync();
+
+        var guildSettings = _guildSettings[Context.Channel];
+        if (guildSettings == null)
+        {
+            await FollowupAsync("Could not retrieve guild settings.", ephemeral: true);
+            return;
+        }
+
+        var removed = false;
+
+        do
+        {
+            var channel = await _db.GetFeedChannelAsync(
+                guildSettings.Id,
+                Context.Channel.Id);
+
+            foreach (var t in await _db.GetTagsAsync(tag))
+            {
+                var tagRef = channel.Tags.FirstOrDefault(x => x.TagId == t.Id);
+
+                if (tagRef != null)
+                {
+                    channel.Tags.Remove(tagRef);
+                    removed = true;
+                }
+            }
+        }
+        while (!await _db.SaveAsync());
+
+        if (removed)
+            await FollowupAsync($"Removed tag '{tag}' from feed channel.");
+        else
+            await FollowupAsync($"Tag '{tag}' was not in the feed channel whitelist.", ephemeral: true);
+    }
+
+    [SlashCommand("mode", "Set the feed channel matching mode")]
+    public async Task ModeAsync(
+        [Summary("mode", "How tags should be matched")]
+        [Choice("Any (match any tag)", "any")]
+        [Choice("All (match all tags)", "all")]
+        string mode)
+    {
+        if (!await EnsureFeedEnabled())
+            return;
+
+        await DeferAsync();
+
+        var guildSettings = _guildSettings[Context.Channel];
+        if (guildSettings == null)
+        {
+            await FollowupAsync("Could not retrieve guild settings.", ephemeral: true);
+            return;
+        }
+
+        if (!Enum.TryParse<FeedChannelWhitelistType>(mode, true, out var type))
+        {
+            await FollowupAsync("Invalid mode.", ephemeral: true);
+            return;
+        }
+
+        do
+        {
+            var channel = await _db.GetFeedChannelAsync(
+                guildSettings.Id,
+                Context.Channel.Id);
+
+            channel.WhitelistType = type;
+        }
+        while (!await _db.SaveAsync());
+
+        await FollowupAsync($"Feed channel mode changed to '{type}'.");
     }
 }

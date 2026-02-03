@@ -143,8 +143,8 @@ namespace nhitomi.Discord
                 // get discord channel
                 var context = new FeedUpdateContext
                 {
-                    Client        = _discord,
-                    Channel       = _discord.GetGuild(channel.GuildId)?.GetTextChannel(channel.Id),
+                    Client        = _discord.Client,
+                    Channel       = _discord.Client.GetGuild(channel.GuildId)?.GetTextChannel(channel.Id),
                     GuildSettings = channel.Guild
                 };
 

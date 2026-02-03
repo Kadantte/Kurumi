@@ -90,7 +90,7 @@ namespace nhitomi.Interactivity.Triggers
                 if (isFeed || Interactive?.Source?.Id != Context.User.Id)
                     context = new DiscordContextWrapper(Context)
                     {
-                        Channel = await Context.User.GetOrCreateDMChannelAsync()
+                        Channel = await Context.User.CreateDMChannelAsync()
                     };
 
                 if (added)

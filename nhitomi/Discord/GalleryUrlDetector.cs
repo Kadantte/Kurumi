@@ -42,9 +42,7 @@ namespace nhitomi.Discord
 
             var content = context.Message.Content;
 
-            // ignore urls in commands
-            if (content.StartsWith(_settings.Discord.Prefix))
-                return false;
+            // Slash commands are handled separately, no need to check for prefix
 
             // match gallery urls
             var ids = GalleryUtility.ParseMany(content);

@@ -1,16 +1,13 @@
-using System;
 using System.Reflection;
 
-namespace nhitomi
+namespace nhitomi;
+
+public static class VersionHelper
 {
-    public static class VersionHelper
-    {
-        static Assembly Assembly => typeof(Startup).Assembly;
+    private static Assembly Assembly => typeof(Startup).Assembly;
 
-        public static Version Version => Assembly.GetName()
-                                                 .Version;
+    public static Version Version => Assembly.GetName().Version ?? new Version(3, 4);
 
-        public static string Codename => Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-                                                 .InformationalVersion;
-    }
+    public static string Codename =>
+        Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "Heresta";
 }

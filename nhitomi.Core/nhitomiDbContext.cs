@@ -290,8 +290,12 @@ WHERE MATCH d.`TagsDenormalized` AGAINST ({{0}} IN BOOLEAN MODE)
 # MySql doesn't support FULLTEXT + BTREE composite index
 ORDER BY d.`UploadTime` DESC");
 
-                var doujins = await Query<Doujin>()
-                                   .FromSql(builder.ToString(), args.Query, args.Source)
+                var parameters = args.Source != null
+                    ? new object[] { args.Query, args.Source }
+                    : new object[] { args.Query };
+
+                var doujins = await Set<Doujin>()
+                                   .FromSqlRaw(builder.ToString(), parameters)
                                    .ToArrayAsync(cancellationToken);
 
                 doujinList.AddRange(doujins);
@@ -470,7 +474,11 @@ ORDER BY d.`UploadTime` DESC");
 
     public sealed class nhitomiDbContextDesignTimeFactory : IDesignTimeDbContextFactory<nhitomiDbContext>
     {
+        private const string DesignTimeConnectionString = "Server=localhost;Database=nhitomi;User=root;Password=password;";
+
         public nhitomiDbContext CreateDbContext(string[] args) => new nhitomiDbContext(
-            new DbContextOptionsBuilder<nhitomiDbContext>().UseMySql("Server=localhost;").Options);
+            new DbContextOptionsBuilder<nhitomiDbContext>()
+                .UseMySql(DesignTimeConnectionString, ServerVersion.AutoDetect(DesignTimeConnectionString))
+                .Options);
     }
 }

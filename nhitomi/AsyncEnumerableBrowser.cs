@@ -18,7 +18,7 @@ namespace nhitomi
             _enumerator = enumerator;
         }
 
-        public async Task<bool> MoveNext(CancellationToken cancellationToken = default)
+        public async ValueTask<bool> MoveNextAsync()
         {
             if (_dict.ContainsKey(Index + 1))
             {
@@ -26,11 +26,16 @@ namespace nhitomi
                 return true;
             }
 
-            if (!await _enumerator.MoveNext(cancellationToken))
+            if (!await _enumerator.MoveNextAsync())
                 return false;
 
             _dict[++Index] = _enumerator.Current;
             return true;
+        }
+
+        public async Task<bool> MoveNext(CancellationToken cancellationToken = default)
+        {
+            return await MoveNextAsync();
         }
 
         public bool MovePrevious()
@@ -44,13 +49,13 @@ namespace nhitomi
 
         public void Reset() => Index = -1;
 
-        public void Dispose() => _enumerator.Dispose();
+        public ValueTask DisposeAsync() => _enumerator.DisposeAsync();
     }
 
     public static class EnumerableBrowserExtensions
     {
         public static AsyncEnumerableBrowser<T> CreateAsyncBrowser<T>(this IAsyncEnumerable<T> enumerable) =>
-            new AsyncEnumerableBrowser<T>(enumerable.GetEnumerator());
+            new AsyncEnumerableBrowser<T>(enumerable.GetAsyncEnumerator());
 
         public static AsyncEnumerableBrowser<T> CreateAsyncBrowser<T>(this IEnumerable<T> enumerable) =>
             enumerable.ToAsyncEnumerable().CreateAsyncBrowser();

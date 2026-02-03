@@ -18,10 +18,11 @@ namespace nhitomi
         static readonly Regex _regex = new Regex(_pattern,              _patternOptions);
         static readonly Regex _strictRegex = new Regex($"^{_pattern}$", _patternOptions);
 
-        public static (string source, string id) Parse(string str)
+        public static (string? source, string? id) Parse(string str)
         {
             var group = _strictRegex.Match(str)
                                     .Groups
+                                    .Cast<Group>()
                                     .FirstOrDefault(g => g.Success && g.Name != null && g.Name.StartsWith("src_"));
 
             return group == null
@@ -33,7 +34,8 @@ namespace nhitomi
         {
             // find successful groups starting with src_
             var groups = _regex.Matches(str)
-                               .SelectMany(m => m.Groups)
+                               .Cast<Match>()
+                               .SelectMany(m => m.Groups.Cast<Group>())
                                .Where(g => g.Success && g.Name != null && g.Name.StartsWith("src_"));
 
             // remove src_ prefixes and return as tuple
@@ -41,7 +43,7 @@ namespace nhitomi
                          .ToArray();
         }
 
-        public static string ExpandContraction(string source)
+        public static string? ExpandContraction(string? source)
         {
             switch (source?.Trim().ToLowerInvariant())
             {

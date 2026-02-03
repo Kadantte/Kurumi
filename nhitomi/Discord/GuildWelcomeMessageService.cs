@@ -25,7 +25,7 @@ namespace nhitomi.Discord
             _discord       = discord;
             _errorReporter = errorReporter;
 
-            _discord.JoinedGuild += HandleJoinedGuild;
+            _discord.Client.JoinedGuild += HandleJoinedGuild;
         }
 
         async Task HandleJoinedGuild(SocketGuild guild)
@@ -33,17 +33,16 @@ namespace nhitomi.Discord
             try
             {
                 // use default localization
-                var l      = Localization.Default["welcomeMessage"];
-                var prefix = _settings.Discord.Prefix;
+                var l = Localization.Default["welcomeMessage"];
 
                 var content = $@"{l["text"]}
 
-**|** {l["get", new { prefix }]}
-**|** {l["download", new { prefix }]}
-**|** {l["search", new { prefix }]}
-**|** {l["language", new { prefix }]}
+**|** Use `/doujin get` to view a specific doujin
+**|** Use `/doujin download` to get a download link
+**|** Use `/doujin search` to search for doujins
+**|** Use `/settings language` to change bot language
 
-{l["referHelp", new { prefix }]}
+Use `/help` for more commands.
 
 {l["openSource", new { repoUrl = "https://github.com/chiyadev/nhitomi" }]}";
 
@@ -71,7 +70,7 @@ namespace nhitomi.Discord
                     e,
                     new GuildJoinedContext
                     {
-                        Client  = _discord,
+                        Client  = _discord.Client,
                         Channel = guild.DefaultChannel,
                         User    = guild.Owner
                     },
@@ -82,10 +81,10 @@ namespace nhitomi.Discord
         class GuildJoinedContext : IDiscordContext
         {
             public IDiscordClient Client { get; set; }
-            public IUserMessage Message => null;
+            public IUserMessage? Message => null;
             public IMessageChannel Channel { get; set; }
             public IUser User { get; set; }
-            public Guild GuildSettings => new Guild();
+            public Guild? GuildSettings => new Guild();
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken) => Task.CompletedTask;

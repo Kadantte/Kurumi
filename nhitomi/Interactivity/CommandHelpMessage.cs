@@ -29,11 +29,10 @@ namespace nhitomi.Interactivity
             {
                 var l       = Context.GetLocalization()["helpMessage"];
                 var command = Message.Command;
-                var prefix  = _settings.Discord.Prefix;
 
                 return new EmbedBuilder
                 {
-                    Title       = $"**nhitomi**: {prefix}{Message.Title ?? command}",
+                    Title       = $"**nhitomi**: /{Message.Title ?? command}",
                     Color       = Color.Purple,
                     Description = l[Message.DescriptionKey],
 
@@ -42,12 +41,12 @@ namespace nhitomi.Interactivity
                         new EmbedFieldBuilder
                         {
                             Name  = l["aliases"],
-                            Value = string.Join(", ", Message.Aliases.Prepend(command).Select(s => $"`{prefix}{s}`"))
+                            Value = string.Join(", ", Message.Aliases.Prepend(command).Select(s => $"`/{s}`"))
                         },
                         new EmbedFieldBuilder
                         {
                             Name  = l["examples"],
-                            Value = string.Join('\n', Message.Examples.Select(s => $"`{prefix}{command} {s}`"))
+                            Value = string.Join('\n', Message.Examples.Select(s => $"`/{command} {s}`"))
                         }
                     }
                 }.Build();
@@ -56,10 +55,10 @@ namespace nhitomi.Interactivity
 
         public static readonly string[] DoujinCommandExamples =
         {
-            "nh/1234",
-            "nhentai 1234",
-            "hitomi/123456",
-            "https://nhentai.net/g/1234/"
+            "get nhentai 1234",
+            "get hitomi 123456",
+            "get-url https://nhentai.net/g/1234/",
+            "search tag:english"
         };
     }
 }

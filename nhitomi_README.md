@@ -7,68 +7,73 @@
 
 # nhitomi ![Build status](https://ci.appveyor.com/api/projects/status/vtdjarua2c9i0k5t?svg=true)
 
-![nhitomi](nhitomi.png)
+**Version 3.4 (Heresta)** — A Discord bot for searching and downloading doujinshi by [chiya.dev](https://chiya.dev).
 
-nhitomi — a Discord bot for searching and downloading doujinshi by [chiya.dev](https://chiya.dev).
+![nhitomi](nhitomi.png)
 
 Join our [Discord server](https://discord.gg/JFNga7q) or [invite nhitomi](https://discordapp.com/oauth2/authorize?client_id=515386276543725568&scope=bot&permissions=347200) to your server.
 
 ## Commands
 
+All commands use Discord slash commands. Type `/` in Discord to see available commands.
+
 ### Doujinshi
 
-- n!get `source` `id` — Displays doujin information from a source by its ID.
-- n!all `source` — Displays all doujins from a source uploaded recently.
-- n!search `query` — Searches for doujins by the title and tags that satisfy your query.
-- n!download `source` `id` — Sends a download link for a doujin by its ID.
-
-### Tag subscriptions
-
-- n!subscription — Lists all tags you are subscribed to.
-- n!subscription add|remove `tag` — Adds or removes a tag subscription.
-- n!subscription clear — Removes all tag subscriptions.
+- `/doujin get source id` — Displays doujin information from a source by its ID.
+- `/doujin get-url url` — Displays doujin information from a URL.
+- `/doujin browse source` — Browse all doujins from a source.
+- `/doujin search query` — Searches for doujins by tags and title.
+- `/doujin download source id` — Sends a download link for a doujin.
+- `/doujin read source id` — Read a doujin in Discord.
 
 ### Collection management
 
-- n!collection — Lists all collections belonging to you.
-- n!collection `name` — Displays doujins belonging to a collection.
-- n!collection `name` add|remove `source` `id` — Adds or removes a doujin in a collection.
-- n!collection `name` list — Lists all doujins belonging to a collection.
-- n!collection `name` sort `attribute` — Sorts doujins in a collection by an attribute (`time`, `id`, `name`, `artist`).
-- n!collection `name` delete — Deletes a collection, removing all doujins belonging to it.
+- `/collection list` — Lists all collections belonging to you.
+- `/collection view name` — Displays doujins belonging to a collection.
+- `/collection add name source id` — Adds a doujin to a collection.
+- `/collection remove name source id` — Removes a doujin from a collection.
+- `/collection sort name sort` — Sorts doujins in a collection.
+- `/collection delete name` — Deletes a collection.
 
-Useful shortcuts to remember:
-- `n!g` — `n!get`, `n!s` — `n!search`, `n!dl` — `n!download`
-- `n!se`, `n!sj`, `n!sc` — `n!search` + `english`, `japanese`, `chinese`, respectively
-- `source/id` — `n!get source id`, can specify multiple to show a list
-- `n!sub` — `n!subscription`
-- `n!c` — `n!collection`
-- paste a doujin link
+### Feed channels (Admin)
+
+- `/feed add-tag tag` — Adds a tag to the feed channel whitelist.
+- `/feed remove-tag tag` — Removes a tag from the feed channel whitelist.
+- `/feed mode mode` — Sets the feed channel matching mode.
+
+### Settings (Admin)
+
+- `/settings language language` — Sets the bot language for the server.
+
+### Help
+
+- `/help` — Shows help information.
+- `/debug` — Shows debug and diagnostic information.
 
 ### Sources
 
 - nhentai — `https://nhentai.net/`
 - hitomi — `https://hitomi.la/`
-- ~~tsumino — `https://tsumino.com/`~~
-- ~~pururin — `https://pururin.io/`~~
 
 ## Running nhitomi
 
 ### Requirements
 
-- [.NET Core 2.1 SDK](https://www.microsoft.com/net/learn/get-started) or higher.
-- For development: a C# IDE with intellisense and syntax highlighting, such as [Visual Studio Code](https://code.visualstudio.com/) or [Jetbrains Rider](https://www.jetbrains.com/rider/).
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or higher.
+- For development: a C# IDE with intellisense and syntax highlighting, such as [Visual Studio Code](https://code.visualstudio.com/) or [JetBrains Rider](https://www.jetbrains.com/rider/).
 
-### ~~Building~~
+### Building
 
-**This section is severely outdated.**
-
-Create a file named `appsecrets.json` alongside `appsettings.json`. This file was intentionally omitted from source control. Then paste the following code, replacing the token string with your own.
+Create a file named `appsettings.Development.json` alongside `appsettings.json`. Then paste the following code, replacing the token string with your own:
 
 ```json
 {
-  "discord": {
-    "token": "..."
+  "Discord": {
+    "Token": "YOUR_BOT_TOKEN_HERE",
+    "TestGuildId": 123456789012345678
+  },
+  "ConnectionStrings": {
+    "nhitomi": "Server=localhost;Database=nhitomi;User=root;Password=password;"
   }
 }
 ```
@@ -77,8 +82,17 @@ Then run the following commands:
 
 1. `dotnet restore` — resolves NuGet dependencies.
 2. `dotnet build` — builds the bot.
-3. `dotnet run` — runs the bot.
+3. `dotnet run --project nhitomi` — runs the bot.
+
+### Docker
+
+```bash
+docker build -t nhitomi .
+docker run -e Discord__Token=YOUR_TOKEN nhitomi
+```
 
 ## License
 
-This project is licensed under the [MIT license](https://opensource.org/licenses/MIT). Please see the [license](LICENSE) for more information.
+Copyright (c) 2018-2019 chiya.dev
+
+This project is licensed under the [MIT license](https://opensource.org/licenses/MIT). Please see the [LICENSE](LICENSE) file for more information.

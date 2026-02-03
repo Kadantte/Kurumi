@@ -1,209 +1,167 @@
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
+using Discord;
+using Discord.Interactions;
 using nhitomi.Core;
 using nhitomi.Discord;
-using nhitomi.Discord.Parsing;
 using nhitomi.Interactivity;
 
-namespace nhitomi.Modules
+namespace nhitomi.Modules;
+
+[Group("doujin", "Commands for browsing and interacting with doujinshi")]
+[RateLimit]
+public class DoujinModule : InteractionModuleBase<SocketInteractionContext>
 {
-    [Module("doujin", IsPrefixed = false)]
-    public class DoujinModule
+    private readonly IDatabase _database;
+    private readonly InteractiveManager _interactive;
+    private readonly GuildSettingsCache _guildSettings;
+
+    public DoujinModule(
+        IDatabase database,
+        InteractiveManager interactive,
+        GuildSettingsCache guildSettings)
     {
-        readonly IMessageContext _context;
-        readonly AppSettings _settings;
-        readonly IDatabase _database;
-        readonly InteractiveManager _interactive;
-
-        public DoujinModule(IMessageContext context,
-                            IOptions<AppSettings> options,
-                            IDatabase database,
-                            InteractiveManager interactive)
-        {
-            _context     = context;
-            _settings    = options.Value;
-            _database    = database;
-            _interactive = interactive;
-        }
-
-        [Command("get", Alias = "g")]
-        public async Task GetAsync(string source,
-                                   string id,
-                                   CancellationToken cancellationToken = default)
-        {
-            var doujin = await _database.GetDoujinAsync(GalleryUtility.ExpandContraction(source),
-                                                        id,
-                                                        cancellationToken);
-
-            if (doujin == null)
-            {
-                await _context.ReplyAsync("doujinNotFound");
-                return;
-            }
-
-            await _interactive.SendInteractiveAsync(new DoujinMessage(doujin), _context, cancellationToken);
-        }
-
-        [Command("get", Alias = "g")]
-        public Task GetAsync(string url,
-                             CancellationToken cancellationToken = default)
-        {
-            var (source, id) = GalleryUtility.Parse(url);
-
-            return GetAsync(source, id, cancellationToken);
-        }
-
-        [Command("get")]
-        public Task GetAsync(CancellationToken cancellationToken = default) => _interactive.SendInteractiveAsync(
-            new CommandHelpMessage
-            {
-                Command        = "get",
-                Aliases        = new[] { "g" },
-                DescriptionKey = "doujins.get",
-                Examples       = CommandHelpMessage.DoujinCommandExamples
-            },
-            _context,
-            cancellationToken);
-
-        [Command("from", Alias = "f")]
-        public Task FromAsync(string source,
-                              CancellationToken cancellationToken = default) => _interactive.SendInteractiveAsync(
-            new DoujinListFromSourceMessage(source),
-            _context,
-            cancellationToken);
-
-        [Command("from")]
-        public Task FromAsync(CancellationToken cancellationToken = default) => _interactive.SendInteractiveAsync(
-            new CommandHelpMessage
-            {
-                Command        = "from",
-                Aliases        = new[] { "f" },
-                DescriptionKey = "doujins.from",
-                Examples = new[]
-                {
-                    "nhentai",
-                    "hitomi"
-                }
-            },
-            _context,
-            cancellationToken);
-
-        [Command("search", Alias = "s"), Binding("[query+]")]
-        public async Task SearchAsync(string query,
-                                      string source = null,
-                                      CancellationToken cancellationToken = default)
-        {
-            if (string.IsNullOrEmpty(query))
-            {
-                await _context.ReplyAsync("invalidQuery", new { query });
-                return;
-            }
-
-            await _interactive.SendInteractiveAsync(
-                new DoujinListFromQueryMessage(new DoujinSearchArgs
-                {
-                    Query         = query,
-                    QualityFilter = false,
-                    Source        = GalleryUtility.ExpandContraction(source)
-                }),
-                _context,
-                cancellationToken);
-        }
-
-        [Command("search")]
-        public Task SearchAsync(CancellationToken cancellationToken = default) => _interactive.SendInteractiveAsync(
-            new CommandHelpMessage
-            {
-                Command        = "search",
-                Aliases        = new[] { "s" },
-                DescriptionKey = "doujins.search",
-                Examples = new[]
-                {
-                    "full color",
-                    "glasses",
-                    "big breasts"
-                }
-            },
-            _context,
-            cancellationToken);
-
-        [Command("download", Alias = "dl")]
-        public async Task DownloadAsync(string source,
-                                        string id,
-                                        CancellationToken cancellationToken = default)
-        {
-            var doujin = await _database.GetDoujinAsync(GalleryUtility.ExpandContraction(source),
-                                                        id,
-                                                        cancellationToken);
-
-            if (doujin == null)
-            {
-                await _context.ReplyAsync("doujinNotFound");
-                return;
-            }
-
-            await _interactive.SendInteractiveAsync(new DownloadMessage(doujin), _context, cancellationToken);
-        }
-
-        [Command("download", Alias = "dl")]
-        public Task DownloadAsync(string url,
-                                  CancellationToken cancellationToken = default)
-        {
-            var (source, id) = GalleryUtility.Parse(url);
-
-            return DownloadAsync(source, id, cancellationToken);
-        }
-
-        [Command("download")]
-        public Task DownloadAsync(CancellationToken cancellationToken = default) => _interactive.SendInteractiveAsync(
-            new CommandHelpMessage
-            {
-                Command        = "download",
-                Aliases        = new[] { "dl" },
-                DescriptionKey = "doujins.download",
-                Examples       = CommandHelpMessage.DoujinCommandExamples
-            },
-            _context,
-            cancellationToken);
-
-        [Command("read", Alias = "r")]
-        public async Task ReadAsync(string source,
-                                    string id,
-                                    CancellationToken cancellationToken = default)
-        {
-            var doujin = await _database.GetDoujinAsync(GalleryUtility.ExpandContraction(source),
-                                                        id,
-                                                        cancellationToken);
-
-            if (doujin == null)
-            {
-                await _context.ReplyAsync("doujinNotFound");
-                return;
-            }
-
-            await _interactive.SendInteractiveAsync(new DoujinReadMessage(doujin), _context, cancellationToken);
-        }
-
-        [Command("read", Alias = "r")]
-        public Task ReadAsync(string url,
-                              CancellationToken cancellationToken = default)
-        {
-            var (source, id) = GalleryUtility.Parse(url);
-
-            return ReadAsync(source, id, cancellationToken);
-        }
-
-        [Command("read")]
-        public Task ReadAsync(CancellationToken cancellationToken = default) => _interactive.SendInteractiveAsync(
-            new CommandHelpMessage
-            {
-                Command        = "read",
-                Aliases        = new[] { "r" },
-                DescriptionKey = "doujins.read",
-                Examples       = CommandHelpMessage.DoujinCommandExamples
-            },
-            _context,
-            cancellationToken);
+        _database = database;
+        _interactive = interactive;
+        _guildSettings = guildSettings;
     }
+
+    private IDiscordContext CreateContext() => new SlashCommandContextAdapter(Context, _guildSettings);
+
+    [SlashCommand("get", "Get information about a specific doujin")]
+    public async Task GetAsync(
+        [Summary("source", "The source site (nhentai, hitomi)")] string source,
+        [Summary("id", "The doujin ID on the source site")] string id)
+    {
+        await DeferAsync();
+
+        var doujin = await _database.GetDoujinAsync(
+            GalleryUtility.ExpandContraction(source),
+            id);
+
+        if (doujin == null)
+        {
+            await FollowupAsync("Doujin not found.", ephemeral: true);
+            return;
+        }
+
+        await _interactive.SendInteractiveAsync(
+            new DoujinMessage(doujin),
+            CreateContext());
+    }
+
+    [SlashCommand("get-url", "Get information about a doujin from URL")]
+    public async Task GetFromUrlAsync(
+        [Summary("url", "The full URL to the doujin")] string url)
+    {
+        var (source, id) = GalleryUtility.Parse(url);
+
+        if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(id))
+        {
+            await RespondAsync("Invalid URL format.", ephemeral: true);
+            return;
+        }
+
+        await GetAsync(source, id);
+    }
+
+    [SlashCommand("browse", "Browse doujins from a specific source")]
+    public async Task BrowseAsync(
+        [Summary("source", "The source site to browse")]
+        [Choice("nhentai", "nhentai")]
+        [Choice("hitomi", "hitomi")]
+        string source)
+    {
+        await DeferAsync();
+
+        await _interactive.SendInteractiveAsync(
+            new DoujinListFromSourceMessage(source),
+            CreateContext());
+    }
+
+    [SlashCommand("search", "Search for doujins")]
+    public async Task SearchAsync(
+        [Summary("query", "Search query (tags, artists, etc.)")] string query,
+        [Summary("source", "Filter by source site (optional)")]
+        [Choice("nhentai", "nhentai")]
+        [Choice("hitomi", "hitomi")]
+        string? source = null)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            await RespondAsync("Please provide a search query.", ephemeral: true);
+            return;
+        }
+
+        await DeferAsync();
+
+        await _interactive.SendInteractiveAsync(
+            new DoujinListFromQueryMessage(new DoujinSearchArgs
+            {
+                Query = query,
+                QualityFilter = false,
+                Source = GalleryUtility.ExpandContraction(source)
+            }),
+            CreateContext());
+    }
+
+    [SlashCommand("download", "Get download links for a doujin")]
+    public async Task DownloadAsync(
+        [Summary("source", "The source site (nhentai, hitomi)")] string source,
+        [Summary("id", "The doujin ID on the source site")] string id)
+    {
+        await DeferAsync();
+
+        var doujin = await _database.GetDoujinAsync(
+            GalleryUtility.ExpandContraction(source),
+            id);
+
+        if (doujin == null)
+        {
+            await FollowupAsync("Doujin not found.", ephemeral: true);
+            return;
+        }
+
+        await _interactive.SendInteractiveAsync(
+            new DownloadMessage(doujin),
+            CreateContext());
+    }
+
+    [SlashCommand("read", "Read a doujin in Discord")]
+    public async Task ReadAsync(
+        [Summary("source", "The source site (nhentai, hitomi)")] string source,
+        [Summary("id", "The doujin ID on the source site")] string id)
+    {
+        await DeferAsync();
+
+        var doujin = await _database.GetDoujinAsync(
+            GalleryUtility.ExpandContraction(source),
+            id);
+
+        if (doujin == null)
+        {
+            await FollowupAsync("Doujin not found.", ephemeral: true);
+            return;
+        }
+
+        await _interactive.SendInteractiveAsync(
+            new DoujinReadMessage(doujin),
+            CreateContext());
+    }
+}
+
+public class SlashCommandContextAdapter : IDiscordContext
+{
+    private readonly SocketInteractionContext _context;
+    private readonly GuildSettingsCache _guildSettings;
+
+    public SlashCommandContextAdapter(SocketInteractionContext context, GuildSettingsCache guildSettings)
+    {
+        _context = context;
+        _guildSettings = guildSettings;
+    }
+
+    public IDiscordClient Client => _context.Client;
+    public IUserMessage? Message => null;
+    public IMessageChannel Channel => _context.Channel;
+    public IUser User => _context.User;
+    public Guild? GuildSettings => _guildSettings[_context.Channel];
 }

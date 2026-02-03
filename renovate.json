@@ -1,5 +1,24 @@
 {
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:base"
-  ]
+  ],
+  "packageRules": [
+    {
+      "matchManagers": ["nuget"],
+      "enabled": true,
+      "groupName": "nuget dependencies"
+    },
+    {
+      "matchPackagePatterns": ["Microsoft.EntityFrameworkCore*", "Pomelo.EntityFrameworkCore*"],
+      "allowedVersions": "<9.0.0",
+      "description": "Pin EF Core to 8.x for .NET 8 compatibility"
+    },
+    {
+      "matchPackagePatterns": ["Microsoft.Extensions.*"],
+      "allowedVersions": "<9.0.0",
+      "description": "Pin Extensions to 8.x for .NET 8 compatibility"
+    }
+  ],
+  "schedule": ["before 6am on monday"]
 }

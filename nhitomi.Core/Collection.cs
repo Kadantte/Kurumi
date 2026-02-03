@@ -24,7 +24,12 @@ namespace nhitomi.Core
 
         public static void Describe(ModelBuilder model)
         {
-            model.Entity<Collection>(collection => { collection.HasIndex(c => c.Name); });
+            model.Entity<Collection>(collection =>
+            {
+                collection.HasIndex(c => c.Name);
+                collection.HasIndex(c => c.OwnerId);
+                collection.HasIndex(c => new { c.OwnerId, c.Name }).IsUnique();
+            });
 
             model.Entity<CollectionRef>(join =>
             {

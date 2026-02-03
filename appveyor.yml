@@ -1,8 +1,27 @@
 clone_depth: 1
 version: '{branch}-{build}'
-image: Visual Studio 2017
-test: off
+image: Visual Studio 2022
+
+environment:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
+
 install:
   - cmd: git submodule update --init --recursive
+  - cmd: dotnet --version
+
+before_build:
+  - cmd: dotnet restore
+
 build_script:
-  - cmd: dotnet build
+  - cmd: dotnet build --configuration Release --no-restore
+
+test_script:
+  - cmd: dotnet test --configuration Release --no-build --logger trx --results-directory TestResults
+
+artifacts:
+  - path: TestResults\**\*.trx
+    name: TestResults
+
+cache:
+  - '%USERPROFILE%\.nuget\packages'

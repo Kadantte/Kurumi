@@ -60,10 +60,10 @@ namespace nhitomi.Discord
             _cache    = cache;
             _discord  = discord;
 
-            _discord.GuildAvailable += RefreshGuildAsync;
-            _discord.JoinedGuild    += RefreshGuildAsync;
+            _discord.Client.GuildAvailable += RefreshGuildAsync;
+            _discord.Client.JoinedGuild    += RefreshGuildAsync;
 
-            foreach (var guild in discord.Guilds)
+            foreach (var guild in discord.Client.Guilds)
                 cache.RefreshQueue.Enqueue(guild.Id);
         }
 
@@ -123,8 +123,8 @@ namespace nhitomi.Discord
         {
             base.Dispose();
 
-            _discord.GuildAvailable -= RefreshGuildAsync;
-            _discord.JoinedGuild    -= RefreshGuildAsync;
+            _discord.Client.GuildAvailable -= RefreshGuildAsync;
+            _discord.Client.JoinedGuild    -= RefreshGuildAsync;
         }
     }
 }

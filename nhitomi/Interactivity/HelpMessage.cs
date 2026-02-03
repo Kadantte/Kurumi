@@ -94,15 +94,14 @@ namespace nhitomi.Interactivity
             {
                 l = l["doujins"];
 
-                var prefix = _settings.Discord.Prefix;
-
                 embed.AddField(l["title"],
                                $@"
-- `{prefix}get` — {l["get"]}
-- `{prefix}from` — {l["from"]}
-- `{prefix}read` — {l["read"]}
-- `{prefix}download` — {l["download"]}
-- `{prefix}search` — {l["search"]}
+- `/doujin get` — {l["get"]}
+- `/doujin get-url` — {l["from"]}
+- `/doujin read` — {l["read"]}
+- `/doujin download` — {l["download"]}
+- `/doujin search` — {l["search"]}
+- `/doujin browse` — Browse all doujins from a source
 ".Trim());
             }
 
@@ -118,37 +117,33 @@ namespace nhitomi.Interactivity
 ".Trim());
             }
 
-            void CollectionsSection(EmbedBuilder embed,
+            static void CollectionsSection(EmbedBuilder embed,
                                     LocalizationAccess l)
             {
                 l = l["collections"];
 
-                var prefix = _settings.Discord.Prefix;
-
                 embed.AddField(l["title"],
                                $@"
-- `{prefix}collections` — {l["list"]}
-- `{prefix}collection {{name}}` — {l["view"]}
-- `{prefix}collection {{name}} add` — {l["add"]}
-- `{prefix}collection {{name}} remove` — {l["remove"]}
-- `{prefix}collection {{name}} sort` — {l["sort"]}
-- `{prefix}collection {{name}} delete` — {l["delete"]}
+- `/collection list` — {l["list"]}
+- `/collection view` — {l["view"]}
+- `/collection add` — {l["add"]}
+- `/collection remove` — {l["remove"]}
+- `/collection sort` — {l["sort"]}
+- `/collection delete` — {l["delete"]}
 ".Trim());
             }
 
-            void OptionsSection(EmbedBuilder embed,
+            static void OptionsSection(EmbedBuilder embed,
                                 LocalizationAccess l)
             {
                 l = l["options"];
 
-                var prefix = _settings.Discord.Prefix;
-
                 embed.AddField(l["title"],
                                $@"
-- `{prefix}option language` — {l["language"]}
-- `{prefix}option feed add` — {l["feed.add"]}
-- `{prefix}option feed remove` — {l["feed.remove"]}
-- `{prefix}option feed mode` — {l["feed.mode"]}
+- `/settings language` — {l["language"]}
+- `/feed add-tag` — {l["feed.add"]}
+- `/feed remove-tag` — {l["feed.remove"]}
+- `/feed mode` — {l["feed.mode"]}
 ".Trim());
             }
 
